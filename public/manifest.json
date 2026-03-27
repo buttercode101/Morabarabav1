@@ -1,0 +1,26 @@
+{
+  "name": "Morabaraba - Traditional African Strategy Game",
+  "short_name": "Morabaraba",
+  "description": "The ancient two-player strategy board game from Southern Africa",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eaddd7",
+  "theme_color": "#f27696",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["games", "entertainment", "education", "culture"]
+}
