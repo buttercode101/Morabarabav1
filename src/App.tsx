@@ -1,10 +1,11 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Users, RotateCcw, Home, Volume2, VolumeX, Trophy, Brain, HelpCircle, Settings, Sparkles, Clock } from 'lucide-react';
+import { Play, Users, RotateCcw, Home, Volume2, VolumeX, Trophy, Brain, HelpCircle, Settings, Sparkles, Clock, BookOpen, Info } from 'lucide-react';
 import { useAudio, useStatistics, useAchievements, useDailyRewards, useParticles, useHaptics, useGameTimer, useLocalStorage } from './hooks';
 import { POINT_COORDINATES, POINT_IDS, ADJACENCY_MAP, MILLS, INITIAL_STATE, PALETTE, STORAGE_KEYS, ACHIEVEMENTS, TUTORIAL_STEPS, BOARD_THEMES, PIECE_THEMES, CULTURAL_INFO, AI_SETTINGS } from './constants';
 import { GamePhase, GameMode, Player, PointId, BoardState, Difficulty, Particle, TutorialState, Achievement } from './types';
 import { getAIMove, getValidMoves, getHint } from './utils/ai';
+import { PremiumButton, GlassCard, Modal, StatCard, AchievementCard, Toggle, Badge } from './components/UIComponents';
 
 export default function App() {
   // Game State
@@ -41,19 +42,20 @@ export default function App() {
     skipped: false,
   });
 
-  // Settings Panel
+  // UI States
   const [showSettings, setShowSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [showTutorial, setShowTutorial] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
+  const [showCulturalInfo, setShowCulturalInfo] = useState(false);
 
   const { board, currentPlayer, cowsToPlace, cowsOnBoard, winner, lastMillPoints } = gameState;
 
   // Check daily reward on mount
   useEffect(() => {
     const check = checkDailyReward();
-    if (check.available) {
+    if (check.available && phase === 'MENU') {
       setShowDailyReward(true);
     }
   }, []);
@@ -72,7 +74,7 @@ export default function App() {
       const lastUnlocked = unlockedThisSession[unlockedThisSession.length - 1];
       const achievement = achievements.find(a => a.id === lastUnlocked);
       if (achievement) {
-        setMessage(`🏆 Achievement: ${achievement.name}!`);
+        setMessage(`🏆 ${achievement.name}!`);
         audio.achievement();
         haptic.success();
         setTimeout(() => setMessage(''), 3000);
@@ -134,14 +136,12 @@ export default function App() {
 
     const occupant = board[point];
 
-    // Tutorial mode - guide player
+    // Tutorial mode
     if (phase === 'TUTORIAL' && !tutorialState.completed) {
       const currentTutorialStep = TUTORIAL_STEPS[tutorialState.currentStep];
-      if (currentTutorialStep) {
-        if (currentTutorialStep.highlightPoints && !currentTutorialStep.highlightPoints.includes(point)) {
-          setMessage('Follow the highlighted spots!');
-          return;
-        }
+      if (currentTutorialStep && currentTutorialStep.highlightPoints && !currentTutorialStep.highlightPoints.includes(point)) {
+        setMessage('👆 Follow the highlighted spots!');
+        return;
       }
     }
 
@@ -168,9 +168,9 @@ export default function App() {
       haptic.light();
       
       if (mill) {
-        spawnParticles(coords.x, coords.y, 'glow', 20, ['#4CAF50', '#8BC34A', '#FFD700']);
+        spawnParticles(coords.x, coords.y, 'glow', 30, ['#4CAF50', '#8BC34A', '#FFD700']);
         audio.mill();
-        setMessage(`Player ${currentPlayer} formed a mill!`);
+        setMessage('✨ MILL FORMED!');
         haptic.success();
         checkAchievement('perfect_mill', millsThisGame + 1);
         setCowsRemovedThisGame(prev => prev + 1);
@@ -198,7 +198,7 @@ export default function App() {
       const win = checkWin({ ...gameState, board: newBoard, cowsOnBoard: newCowsOnBoard });
 
       const coords = POINT_COORDINATES[point];
-      spawnParticles(coords.x, coords.y, 'spark', 15, ['#f27696', '#FFD700']);
+      spawnParticles(coords.x, coords.y, 'spark', 20, ['#f27696', '#FFD700']);
 
       if (win) {
         setGameState(prev => ({ ...prev, board: newBoard, cowsLost: newCowsLost, cowsOnBoard: newCowsOnBoard, winner: win }));
@@ -244,7 +244,7 @@ export default function App() {
         const newBoard = { ...board, [selectedPoint]: null, [point]: currentPlayer };
         const mill = checkMill(newBoard, point, currentPlayer);
 
-        if (canFly && !gameState.phase === 'FLYING') {
+        if (canFly && gameState.phase !== 'FLYING') {
           setFlyingThisGame(prev => prev + 1);
           checkAchievement('fly_like_bird', flyingThisGame + 1);
         }
@@ -252,7 +252,7 @@ export default function App() {
         const win = checkWin({ ...gameState, board: newBoard });
 
         const coords = POINT_COORDINATES[point];
-        spawnParticles(coords.x, coords.y, 'dust', 6);
+        spawnParticles(coords.x, coords.y, 'dust', 10);
 
         if (win) {
           setGameState(prev => ({ ...prev, board: newBoard, winner: win }));
@@ -268,10 +268,10 @@ export default function App() {
             phase: 'SHOOTING',
             lastMillPoints: mill,
           }));
-          spawnParticles(coords.x, coords.y, 'glow', 20);
+          spawnParticles(coords.x, coords.y, 'glow', 30);
           audio.mill();
           haptic.success();
-          setMessage(`Player ${currentPlayer} formed a mill!`);
+          setMessage('✨ MILL!');
           checkAchievement('perfect_mill', millsThisGame + 1);
           setCowsRemovedThisGame(prev => prev + 1);
           setTimeout(() => setMessage(''), 2000);
@@ -296,7 +296,7 @@ export default function App() {
     setMode(selectedMode);
     setGameState(INITIAL_STATE);
     setSelectedPoint(null);
-    setPhase(selectedMode === 'AI' ? 'PLAYING' : 'PLAYING');
+    setPhase('PLAYING');
     setMessage('');
     setCowsRemovedThisGame(0);
     setFlyingThisGame(0);
@@ -327,7 +327,8 @@ export default function App() {
   const claimReward = () => {
     const reward = claimDailyReward();
     if (reward) {
-      setMessage(`🎁 Claimed ${reward.coins} coins!`);
+      addCoins(reward.coins);
+      setMessage(`🎁 +${reward.coins} Coins!`);
       audio.achievement();
       haptic.success();
       setTimeout(() => setMessage(''), 2000);
@@ -342,24 +343,27 @@ export default function App() {
   if (showDailyReward) {
     const check = checkDailyReward();
     return (
-      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div className="fixed inset-0 modal-backdrop flex items-center justify-center z-50 p-4">
         <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-gradient-to-b from-[#30221e] to-[#5b433b] rounded-2xl p-8 max-w-md w-full text-center border-2 border-[#f27696]"
+          initial={{ scale: 0.8, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          className="glass-card-premium p-8 max-w-md w-full text-center"
         >
-          <div className="text-6xl mb-4">🎁</div>
-          <h2 className="text-3xl font-bold text-white mb-2">Daily Reward!</h2>
-          <p className="text-[#bfa094] mb-6">Day {check.streak} of your streak!</p>
-          <div className="bg-white/10 rounded-xl p-4 mb-6">
-            <div className="text-4xl font-bold text-[#f27696]">+{check.reward?.coins} Coins</div>
+          <div className="text-7xl mb-6 animate-bounce-subtle">🎁</div>
+          <h2 className="text-4xl font-black text-gradient-gold mb-4 text-premium">Daily Reward!</h2>
+          <p className="text-lg text-white/80 mb-6">Day <span className="text-[#FFD700] font-bold">{check.streak}</span> of your streak!</p>
+          <div className="bg-gradient-to-br from-[#FFD700]/20 to-[#DAA520]/10 rounded-2xl p-6 mb-8 border border-[#FFD700]/30">
+            <div className="text-5xl font-black text-[#FFD700]">+{check.reward?.coins}</div>
+            <div className="text-white/70 font-medium mt-1">Coins</div>
           </div>
-          <button 
+          <PremiumButton 
+            variant="gold" 
+            size="xl" 
             onClick={claimReward}
-            className="w-full bg-[#f27696] hover:bg-[#e94a74] text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105"
+            className="w-full"
           >
             Claim Reward
-          </button>
+          </PremiumButton>
         </motion.div>
       </div>
     );
@@ -368,273 +372,292 @@ export default function App() {
   // Render Menu
   if (phase === 'MENU') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#30221e] to-[#5b433b] text-[#fdf8f6] p-6 relative">
-        {/* Header Stats */}
-        <div className="flex justify-between items-center mb-8">
-          <div className="flex items-center gap-4">
-            <div className="bg-white/10 rounded-full px-4 py-2 flex items-center gap-2">
-              <span className="text-xl">🪙</span>
-              <span className="font-bold">{coins}</span>
+      <div className="min-h-screen bg-gradient-to-b from-[#1A0E05] via-[#2A1A0A] to-[#3A2010] text-white relative overflow-hidden">
+        {/* Animated Background Pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute inset-0" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FFD700' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+          }} />
+        </div>
+
+        {/* Safe Area Container */}
+        <div className="relative z-10 safe-container min-h-screen flex flex-col">
+          {/* Header Stats */}
+          <motion.header 
+            initial={{ y: -20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="flex justify-between items-center pt-4 pb-6 px-6"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-lg rounded-full px-4 py-2.5 border border-white/20">
+                <span className="text-2xl">🪙</span>
+                <span className="font-bold text-lg">{coins}</span>
+              </div>
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-lg rounded-full px-4 py-2.5 border border-white/20">
+                <span className="text-2xl">🔥</span>
+                <span className="font-bold text-lg">{streak.currentStreak}<span className="text-white/60 text-sm ml-1">day streak</span></span>
+              </div>
             </div>
-            <div className="bg-white/10 rounded-full px-4 py-2 flex items-center gap-2">
-              <span className="text-xl">🔥</span>
-              <span className="font-bold">{streak.currentStreak} day streak</span>
-            </div>
-          </div>
-          <button 
-            onClick={() => setShowSettings(true)}
-            className="p-3 bg-white/10 rounded-full hover:bg-white/20 transition-all"
-          >
-            <Settings className="w-6 h-6" />
-          </button>
-        </div>
-
-        <motion.div 
-          initial={{ opacity: 0, y: 30 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          className="text-center mb-12 mt-8"
-        >
-          <h1 className="text-6xl md:text-8xl font-bold mb-4 tracking-tighter">MORABARABA</h1>
-          <p className="text-[#bfa094] text-lg italic">"The Game of the Herd"</p>
-        </motion.div>
-
-        <div className="flex flex-col gap-4 w-full max-w-md mb-8">
-          <button 
-            onClick={() => startGame('AI')} 
-            className="bg-[#f27696] hover:bg-[#e94a74] text-white px-8 py-4 rounded-xl font-bold text-xl transition-all hover:scale-105 flex items-center justify-center gap-3"
-          >
-            <Brain className="w-6 h-6" /> VS COMPUTER
-          </button>
-          <button 
-            onClick={() => startGame('HOTSEAT')} 
-            className="border-2 border-[#bfa094] text-[#bfa094] hover:bg-[#bfa094] hover:text-[#30221e] px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-3"
-          >
-            <Users className="w-6 h-6" /> 2 PLAYER
-          </button>
-          <button 
-            onClick={startTutorial}
-            className="bg-white/10 hover:bg-white/20 text-white px-8 py-4 rounded-xl font-bold text-lg transition-all flex items-center justify-center gap-3"
-          >
-            <HelpCircle className="w-6 h-6" /> TUTORIAL
-          </button>
-        </div>
-
-        <div className="flex gap-4 justify-center mb-8">
-          <button 
-            onClick={() => setShowAchievements(true)}
-            className="bg-white/10 hover:bg-white/20 p-4 rounded-full transition-all"
-            title="Achievements"
-          >
-            <Trophy className="w-6 h-6" />
-          </button>
-          <button 
-            onClick={() => setShowStats(true)}
-            className="bg-white/10 hover:bg-white/20 p-4 rounded-full transition-all"
-            title="Statistics"
-          >
-            <Clock className="w-6 h-6" />
-          </button>
-          <button 
-            onClick={() => setSound(s => !s)} 
-            className="bg-white/10 hover:bg-white/20 p-4 rounded-full transition-all"
-          >
-            {sound ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
-          </button>
-        </div>
-
-        <div className="text-center text-sm text-[#bfa094]/60">
-          <p>Wins: {stats.wins} | Losses: {stats.losses} | Win Rate: {stats.winRate.toFixed(1)}%</p>
-        </div>
-
-        {/* Settings Modal */}
-        {showSettings && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-gradient-to-b from-[#30221e] to-[#5b433b] rounded-2xl p-8 max-w-md w-full"
+            <button
+              onClick={() => setShowSettings(true)}
+              className="p-3 bg-white/10 backdrop-blur-lg rounded-full hover:bg-white/20 transition-all border border-white/20"
             >
-              <h2 className="text-2xl font-bold text-white mb-6">Settings</h2>
-              
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-[#fdf8f6]">Sound Effects</span>
-                  <button 
-                    onClick={() => setSound(!sound)}
-                    className={`w-14 h-8 rounded-full transition-all ${sound ? 'bg-[#f27696]' : 'bg-white/20'}`}
-                  >
-                    <div className={`w-6 h-6 bg-white rounded-full transition-all ${sound ? 'translate-x-7' : 'translate-x-1'}`} />
-                  </button>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-[#fdf8f6]">Haptics</span>
-                  <button 
-                    onClick={() => setHaptics(!haptics)}
-                    className={`w-14 h-8 rounded-full transition-all ${haptics ? 'bg-[#f27696]' : 'bg-white/20'}`}
-                  >
-                    <div className={`w-6 h-6 bg-white rounded-full transition-all ${haptics ? 'translate-x-7' : 'translate-x-1'}`} />
-                  </button>
-                </div>
+              <Settings className="w-6 h-6" />
+            </button>
+          </motion.header>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-[#fdf8f6]">Board Theme</span>
-                  <select 
+          {/* Main Content */}
+          <main className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+            {/* Title */}
+            <motion.div 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="text-center mb-12"
+            >
+              <h1 className="text-7xl md:text-9xl font-black mb-4 tracking-tighter text-premium">
+                <span className="text-gradient-gold">MORABARABA</span>
+              </h1>
+              <p className="text-xl text-white/70 italic font-medium">"The Game of the Herd"</p>
+            </motion.div>
+
+            {/* Main Action Buttons */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="flex flex-col gap-4 w-full max-w-md mb-8"
+            >
+              <PremiumButton 
+                variant="primary" 
+                size="xl" 
+                icon={Brain}
+                onClick={() => startGame('AI')}
+                className="w-full"
+              >
+                VS COMPUTER
+              </PremiumButton>
+              <PremiumButton 
+                variant="secondary" 
+                size="xl" 
+                icon={Users}
+                onClick={() => startGame('HOTSEAT')}
+                className="w-full"
+              >
+                2 PLAYER
+              </PremiumButton>
+              <PremiumButton 
+                variant="earth" 
+                size="lg" 
+                icon={HelpCircle}
+                onClick={startTutorial}
+                className="w-full"
+              >
+                TUTORIAL
+              </PremiumButton>
+            </motion.div>
+
+            {/* Secondary Actions */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="flex gap-3 justify-center mb-8 flex-wrap"
+            >
+              <button
+                onClick={() => setShowAchievements(true)}
+                className="p-4 bg-white/10 backdrop-blur-lg rounded-full hover:bg-white/20 transition-all border border-white/20 group"
+                title="Achievements"
+              >
+                <Trophy className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              </button>
+              <button
+                onClick={() => setShowStats(true)}
+                className="p-4 bg-white/10 backdrop-blur-lg rounded-full hover:bg-white/20 transition-all border border-white/20 group"
+                title="Statistics"
+              >
+                <Clock className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              </button>
+              <button
+                onClick={() => setShowCulturalInfo(true)}
+                className="p-4 bg-white/10 backdrop-blur-lg rounded-full hover:bg-white/20 transition-all border border-white/20 group"
+                title="Cultural Info"
+              >
+                <BookOpen className="w-6 h-6 group-hover:scale-110 transition-transform" />
+              </button>
+              <button
+                onClick={() => setSound(s => !s)}
+                className="p-4 bg-white/10 backdrop-blur-lg rounded-full hover:bg-white/20 transition-all border border-white/20 group"
+              >
+                {sound ? <Volume2 className="w-6 h-6 group-hover:scale-110 transition-transform" /> : <VolumeX className="w-6 h-6 group-hover:scale-110 transition-transform" />}
+              </button>
+            </motion.div>
+
+            {/* Quick Stats */}
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="text-center"
+            >
+              <div className="inline-flex items-center gap-4 bg-white/10 backdrop-blur-lg rounded-full px-6 py-3 border border-white/20">
+                <span className="text-white/70">Wins:</span>
+                <span className="font-bold text-[#4CAF50]">{stats.wins}</span>
+                <span className="text-white/70">|</span>
+                <span className="text-white/70">Losses:</span>
+                <span className="font-bold text-[#EF4444]">{stats.losses}</span>
+                <span className="text-white/70">|</span>
+                <span className="text-white/70">Win Rate:</span>
+                <span className="font-bold text-[#FFD700]">{stats.winRate.toFixed(1)}%</span>
+              </div>
+            </motion.div>
+          </main>
+        </div>
+
+        {/* Modals */}
+        <AnimatePresence>
+          {showSettings && (
+            <Modal
+              isOpen={showSettings}
+              onClose={() => setShowSettings(false)}
+              title="Settings"
+              icon={Settings}
+              size="md"
+            >
+              <div className="space-y-6">
+                <Toggle label="Sound Effects" enabled={sound} onToggle={setSound} />
+                <Toggle label="Haptic Feedback" enabled={haptics} onToggle={setHaptics} />
+                
+                <div className="space-y-2">
+                  <label className="text-white/70 text-sm font-medium">Board Theme</label>
+                  <select
                     value={boardTheme}
                     onChange={(e) => setBoardTheme(e.target.value)}
-                    className="bg-white/10 rounded-lg px-4 py-2 text-white"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#FFD700]"
                   >
                     {Object.entries(BOARD_THEMES).map(([key, theme]) => (
-                      <option key={key} value={key} className="bg-[#30221e]">{theme.name}</option>
+                      <option key={key} value={key} className="bg-[#1A0E05]">{theme.name}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-[#fdf8f6]">Piece Theme</span>
-                  <select 
+                <div className="space-y-2">
+                  <label className="text-white/70 text-sm font-medium">Piece Theme</label>
+                  <select
                     value={pieceTheme}
                     onChange={(e) => setPieceTheme(e.target.value)}
-                    className="bg-white/10 rounded-lg px-4 py-2 text-white"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#FFD700]"
                   >
                     {Object.entries(PIECE_THEMES).map(([key, theme]) => (
-                      <option key={key} value={key} className="bg-[#30221e]">{theme.name}</option>
+                      <option key={key} value={key} className="bg-[#1A0E05]">{theme.name}</option>
                     ))}
                   </select>
                 </div>
 
-                <div className="flex justify-between items-center">
-                  <span className="text-[#fdf8f6]">AI Difficulty</span>
-                  <select 
+                <div className="space-y-2">
+                  <label className="text-white/70 text-sm font-medium">AI Difficulty</label>
+                  <select
                     value={difficulty}
                     onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                    className="bg-white/10 rounded-lg px-4 py-2 text-white"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#FFD700]"
                   >
                     {Object.entries(AI_SETTINGS).map(([key, settings]) => (
-                      <option key={key} value={key} className="bg-[#30221e]">{settings.name}</option>
+                      <option key={key} value={key} className="bg-[#1A0E05]">{settings.name}</option>
                     ))}
                   </select>
                 </div>
               </div>
+            </Modal>
+          )}
 
-              <button 
-                onClick={() => setShowSettings(false)}
-                className="w-full mt-8 bg-[#f27696] hover:bg-[#e94a74] text-white px-8 py-4 rounded-xl font-bold transition-all"
-              >
-                Close
-              </button>
-            </motion.div>
-          </div>
-        )}
-
-        {/* Achievements Modal */}
-        {showAchievements && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-gradient-to-b from-[#30221e] to-[#5b433b] rounded-2xl p-8 max-w-2xl w-full my-8"
+          {showAchievements && (
+            <Modal
+              isOpen={showAchievements}
+              onClose={() => setShowAchievements(false)}
+              title="Achievements"
+              icon={Trophy}
+              size="lg"
             >
-              <h2 className="text-2xl font-bold text-white mb-6">
-                Achievements ({getUnlockedCount()}/{ACHIEVEMENTS.length})
-              </h2>
-              <div className="mb-6 bg-white/10 rounded-lg p-3">
-                <div className="text-sm text-[#bfa094]">Overall Progress</div>
-                <div className="w-full bg-white/20 rounded-full h-4 mt-2">
-                  <div 
-                    className="bg-[#f27696] h-4 rounded-full transition-all"
-                    style={{ width: `${getTotalProgress()}%` }}
+              <div className="mb-6">
+                <div className="flex justify-between text-sm text-white/70 mb-2">
+                  <span>Overall Progress</span>
+                  <span>{getUnlockedCount()}/{ACHIEVEMENTS.length}</span>
+                </div>
+                <div className="w-full bg-white/20 rounded-full h-4">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${getTotalProgress()}%` }}
+                    className="bg-gradient-to-r from-[#FFD700] to-[#DAA520] h-4 rounded-full"
                   />
                 </div>
-                <div className="text-right text-xs text-[#bfa094] mt-1">{getTotalProgress().toFixed(1)}%</div>
+                <div className="text-right text-xs text-white/60 mt-1">{getTotalProgress().toFixed(1)}%</div>
               </div>
-              <div className="grid gap-3 max-h-96 overflow-y-auto">
+              <div className="grid gap-3 max-h-[60vh] overflow-y-auto pr-2">
                 {achievements.map(achievement => (
-                  <div 
-                    key={achievement.id}
-                    className={`p-4 rounded-xl border-2 transition-all ${achievement.unlocked ? 'border-[#f27696] bg-[#f27696]/20' : 'border-white/20 bg-white/5 opacity-60'}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl">{achievement.icon}</span>
-                      <div className="flex-1">
-                        <div className="font-bold text-white">{achievement.name}</div>
-                        <div className="text-sm text-[#bfa094]">{achievement.description}</div>
-                        {!achievement.unlocked && (
-                          <div className="w-full bg-white/20 rounded-full h-2 mt-2">
-                            <div 
-                              className="bg-[#f27696] h-2 rounded-full transition-all"
-                              style={{ width: `${Math.min(100, (achievement.progress / achievement.requirement) * 100)}%` }}
-                            />
-                          </div>
-                        )}
-                      </div>
-                      {achievement.unlocked && <span className="text-2xl">✅</span>}
-                    </div>
-                  </div>
+                  <AchievementCard key={achievement.id} achievement={achievement} />
                 ))}
               </div>
-              <button 
-                onClick={() => setShowAchievements(false)}
-                className="w-full mt-6 bg-[#f27696] hover:bg-[#e94a74] text-white px-8 py-4 rounded-xl font-bold transition-all"
-              >
-                Close
-              </button>
-            </motion.div>
-          </div>
-        )}
+            </Modal>
+          )}
 
-        {/* Statistics Modal */}
-        {showStats && (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-gradient-to-b from-[#30221e] to-[#5b433b] rounded-2xl p-8 max-w-md w-full"
+          {showStats && (
+            <Modal
+              isOpen={showStats}
+              onClose={() => setShowStats(false)}
+              title="Statistics"
+              icon={Clock}
+              size="md"
             >
-              <h2 className="text-2xl font-bold text-white mb-6">Statistics</h2>
               <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/10 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-[#f27696]">{stats.totalGames}</div>
-                  <div className="text-sm text-[#bfa094]">Games Played</div>
+                <StatCard icon={Play} label="Games Played" value={stats.totalGames} color="pink" />
+                <StatCard icon={Trophy} label="Wins" value={stats.wins} color="green" />
+                <StatCard label="Losses" value={stats.losses} color="gold" />
+                <StatCard label="Win Rate" value={`${stats.winRate.toFixed(1)}%`} color="gold" />
+                <StatCard label="Current Streak" value={stats.currentStreak} color="pink" />
+                <StatCard label="Best Streak" value={stats.bestStreak} color="gold" />
+                <StatCard label="Mills Formed" value={stats.totalMillsFormed} color="green" />
+                <StatCard label="Play Time" value={formatTime(stats.totalPlayTime)} color="gold" />
+              </div>
+            </Modal>
+          )}
+
+          {showCulturalInfo && (
+            <Modal
+              isOpen={showCulturalInfo}
+              onClose={() => setShowCulturalInfo(false)}
+              title="About Morabaraba"
+              icon={BookOpen}
+              size="lg"
+            >
+              <div className="space-y-6 text-white/80">
+                <div>
+                  <h3 className="font-bold text-white text-lg mb-2">History</h3>
+                  <p className="leading-relaxed">{CULTURAL_INFO.history}</p>
                 </div>
-                <div className="bg-white/10 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-[#4CAF50]">{stats.wins}</div>
-                  <div className="text-sm text-[#bfa094]">Wins</div>
+                <div>
+                  <h3 className="font-bold text-white text-lg mb-2">Cultural Significance</h3>
+                  <p className="leading-relaxed">{CULTURAL_INFO.culturalSignificance}</p>
                 </div>
-                <div className="bg-white/10 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-[#E53935]">{stats.losses}</div>
-                  <div className="text-sm text-[#bfa094]">Losses</div>
+                <div>
+                  <h3 className="font-bold text-white text-lg mb-2">Traditional Rules</h3>
+                  <ul className="list-disc list-inside space-y-1">
+                    {CULTURAL_INFO.traditionalRules.map((rule, i) => (
+                      <li key={i}>{rule}</li>
+                    ))}
+                  </ul>
                 </div>
-                <div className="bg-white/10 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-[#FFD700]">{stats.winRate.toFixed(1)}%</div>
-                  <div className="text-sm text-[#bfa094]">Win Rate</div>
-                </div>
-                <div className="bg-white/10 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-[#f27696]">{stats.currentStreak}</div>
-                  <div className="text-sm text-[#bfa094]">Current Streak</div>
-                </div>
-                <div className="bg-white/10 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-[#f27696]">{stats.bestStreak}</div>
-                  <div className="text-sm text-[#bfa094]">Best Streak</div>
-                </div>
-                <div className="bg-white/10 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-[#4CAF50]">{stats.totalMillsFormed}</div>
-                  <div className="text-sm text-[#bfa094]">Mills Formed</div>
-                </div>
-                <div className="bg-white/10 rounded-xl p-4 text-center">
-                  <div className="text-3xl font-bold text-[#FFD700]">{formatTime(stats.totalPlayTime)}</div>
-                  <div className="text-sm text-[#bfa094]">Play Time</div>
+                <div>
+                  <h3 className="font-bold text-white text-lg mb-2">Proverbs</h3>
+                  <ul className="list-disc list-inside space-y-1 italic">
+                    {CULTURAL_INFO.proverbs.map((proverb, i) => (
+                      <li key={i}>{proverb}</li>
+                    ))}
+                  </ul>
                 </div>
               </div>
-              <button 
-                onClick={() => setShowStats(false)}
-                className="w-full mt-6 bg-[#f27696] hover:bg-[#e94a74] text-white px-8 py-4 rounded-xl font-bold transition-all"
-              >
-                Close
-              </button>
-            </motion.div>
-          </div>
-        )}
+            </Modal>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
@@ -643,30 +666,42 @@ export default function App() {
   if (phase === 'GAME_OVER' || winner) {
     stopTimer();
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#30221e] to-[#5b433b] text-[#fdf8f6] p-6 text-center">
+      <div className="min-h-screen bg-gradient-to-b from-[#1A0E05] via-[#2A1A0A] to-[#3A2010] text-white p-6 text-center safe-container">
         <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }} 
-          animate={{ scale: 1, opacity: 1 }} 
-          className="mb-8 mt-20"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="mt-20 mb-8"
         >
-          <div className="text-6xl mb-4">{winner === 1 ? '🏆' : winner === 2 ? '😔' : '🤝'}</div>
-          <h1 className="text-5xl font-bold mb-4">{winner === 1 ? 'VICTORY!' : winner === 2 ? 'DEFEAT' : 'DRAW!'}</h1>
-          <p className="text-[#bfa094] text-lg mb-4">Game Time: {formatTime(elapsed)}</p>
-          <p className="text-[#bfa094] text-lg">Mills Formed: {millsThisGame}</p>
+          <div className="text-8xl mb-6 animate-bounce-subtle">
+            {winner === 1 ? '🏆' : winner === 2 ? '😔' : '🤝'}
+          </div>
+          <h1 className="text-6xl md:text-7xl font-black mb-4 text-premium">
+            <span className={winner === 1 ? 'text-gradient-gold' : winner === 2 ? 'text-white' : 'text-white'}>
+              {winner === 1 ? 'VICTORY!' : winner === 2 ? 'DEFEAT' : 'DRAW!'}
+            </span>
+          </h1>
+          <div className="flex justify-center gap-6 text-lg text-white/70 mb-4">
+            <span>Game Time: <span className="text-[#FFD700] font-bold">{formatTime(elapsed)}</span></span>
+            <span>Mills: <span className="text-[#FFD700] font-bold">{millsThisGame}</span></span>
+          </div>
         </motion.div>
         <div className="flex gap-4 justify-center flex-wrap">
-          <button 
-            onClick={() => startGame(mode)} 
-            className="bg-[#f27696] hover:bg-[#e94a74] text-white px-8 py-4 rounded-xl font-bold flex items-center gap-3"
+          <PremiumButton 
+            variant="primary" 
+            size="xl" 
+            icon={RotateCcw}
+            onClick={() => startGame(mode)}
           >
-            <RotateCcw className="w-6 h-6" /> REMATCH
-          </button>
-          <button 
-            onClick={quitToMenu} 
-            className="border-2 border-[#bfa094] text-[#bfa094] hover:bg-[#bfa094] hover:text-[#30221e] px-8 py-4 rounded-xl font-bold flex items-center gap-3"
+            REMATCH
+          </PremiumButton>
+          <PremiumButton 
+            variant="secondary" 
+            size="xl" 
+            icon={Home}
+            onClick={quitToMenu}
           >
-            <Home className="w-6 h-6" /> MENU
-          </button>
+            MENU
+          </PremiumButton>
         </div>
       </div>
     );
@@ -674,20 +709,20 @@ export default function App() {
 
   // Render Game
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: currentTheme.background }}>
+    <div className="min-h-screen flex flex-col safe-container" style={{ background: currentTheme.background }}>
       {/* Header */}
-      <header className="bg-[#5b433b]/90 text-[#fdf8f6] px-6 py-4 flex items-center justify-between backdrop-blur-sm">
-        <button onClick={quitToMenu} className="text-[#f27696] hover:text-[#f27696]/80 font-bold flex items-center gap-2">
-          <Home className="w-5 h-5" /> MENU
+      <header className="bg-[#5b433b]/90 backdrop-blur-lg text-white px-6 py-4 flex items-center justify-between border-b border-white/10">
+        <button onClick={quitToMenu} className="text-[#f27696] hover:text-[#f27696]/80 font-bold flex items-center gap-2 transition-all">
+          <Home className="w-5 h-5" /> <span className="hidden sm:inline">MENU</span>
         </button>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white/10 backdrop-blur-lg rounded-full px-4 py-2 border border-white/20">
             <span className="text-xl">🪙</span>
             <span className="font-bold">{coins}</span>
           </div>
           <button 
             onClick={() => setShowHint(!showHint)}
-            className={`p-2 rounded-full transition-all ${showHint ? 'bg-[#f27696]' : 'bg-white/10 hover:bg-white/20'}`}
+            className={`p-2 rounded-full transition-all border ${showHint ? 'bg-[#FFD700] border-[#FFD700]' : 'bg-white/10 border-white/20 hover:bg-white/20'}`}
             title="Show hint"
           >
             <Sparkles className="w-5 h-5" />
@@ -696,30 +731,30 @@ export default function App() {
       </header>
 
       {/* Game Info */}
-      <div className="bg-[#846358]/20 px-6 py-4 flex items-center justify-between backdrop-blur-sm">
+      <div className="bg-[#846358]/20 backdrop-blur-lg px-6 py-4 flex items-center justify-between border-b border-white/10">
         <div className="text-center">
-          <p className="text-xs text-[#fdf8f6] font-bold">PLAYER 1</p>
+          <p className="text-xs text-white font-bold">PLAYER 1</p>
           <div className="flex gap-1 mt-1">
             {Array.from({ length: cowsOnBoard[1] }).map((_, i) => (
               <div key={i} className="w-3 h-3 rounded-full" style={{ background: currentPieces.player1 }} />
             ))}
           </div>
-          <p className="text-xs text-[#fdf8f6]/80 mt-1">To place: {cowsToPlace[1]}</p>
+          <p className="text-xs text-white/70 mt-1">To place: {cowsToPlace[1]}</p>
         </div>
         <div className="text-center">
-          <p className="text-sm text-[#fdf8f6] font-bold">{mode === 'AI' ? `VS ${AI_SETTINGS[difficulty].name}` : '2 PLAYER'}</p>
+          <p className="text-sm text-white font-bold">{mode === 'AI' ? `VS ${AI_SETTINGS[difficulty].name}` : '2 PLAYER'}</p>
           <p className="text-xs text-[#f27696] font-bold">Player {currentPlayer}'s turn</p>
           {message && <p className="text-xs text-[#4CAF50] font-bold mt-1 animate-pulse">{message}</p>}
-          <div className="text-xs text-[#fdf8f6]/60 mt-1">{formatTime(elapsed)}</div>
+          <div className="text-xs text-white/60 mt-1">{formatTime(elapsed)}</div>
         </div>
         <div className="text-center">
-          <p className="text-xs text-[#fdf8f6] font-bold">PLAYER 2</p>
+          <p className="text-xs text-white font-bold">PLAYER 2</p>
           <div className="flex gap-1 mt-1">
             {Array.from({ length: cowsOnBoard[2] }).map((_, i) => (
               <div key={i} className="w-3 h-3 rounded-full" style={{ background: currentPieces.player2 }} />
             ))}
           </div>
-          <p className="text-xs text-[#fdf8f6]/80 mt-1">To place: {cowsToPlace[2]}</p>
+          <p className="text-xs text-white/70 mt-1">To place: {cowsToPlace[2]}</p>
         </div>
       </div>
 
@@ -766,7 +801,7 @@ export default function App() {
             />
           )}
 
-          {/* Legal move indicators */}
+          {/* Points and cows */}
           {POINT_IDS.map(point => {
             const { x, y } = POINT_COORDINATES[point];
             const occupant = board[point];
@@ -817,8 +852,8 @@ export default function App() {
       </main>
 
       {/* Instructions */}
-      <div className="bg-[#5b433b]/90 px-6 py-4 text-center backdrop-blur-sm">
-        <p className="text-sm text-[#fdf8f6]">
+      <div className="bg-[#5b433b]/90 backdrop-blur-lg px-6 py-4 text-center border-t border-white/10">
+        <p className="text-sm text-white">
           {gameState.phase === 'PLACING' && '📍 Place your cow on an empty point'}
           {gameState.phase === 'MOVING' && '👆 Select a cow, then tap an adjacent empty point'}
           {gameState.phase === 'FLYING' && '🦅 Flying! Select a cow, then tap any empty point'}
