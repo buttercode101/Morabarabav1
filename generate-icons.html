@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Icon Generator</title>
+  </head>
+  <body>
+    <canvas id="canvas192" width="192" height="192"></canvas>
+    <canvas id="canvas512" width="512" height="512"></canvas>
+    <script>
+      const PALETTE = {
+        board: '#eaddd7',
+        lines: '#5b433b',
+        player1: '#30221e',
+        player2: '#fdf8f6',
+        accent: '#f27696',
+      };
+
+      function drawMorabarabaIcon(ctx, size) {
+        const scale = size / 512;
+        const centerX = size / 2;
+        const centerY = size / 2;
+
+        // Background
+        ctx.fillStyle = PALETTE.board;
+        ctx.fillRect(0, 0, size, size);
+
+        // Outer square
+        ctx.strokeStyle = PALETTE.lines;
+        ctx.lineWidth = 8 * scale;
+        ctx.strokeRect(100 * scale, 100 * scale, 312 * scale, 312 * scale);
+
+        // Middle square
+        ctx.strokeRect(150 * scale, 150 * scale, 212 * scale, 212 * scale);
+
+        // Inner square
+        ctx.strokeRect(200 * scale, 200 * scale, 112 * scale, 112 * scale);
+
+        // Connecting lines
+        const lines = [
+          [256, 100, 256, 200], [256, 312, 256, 412],
+          [100, 256, 200, 256], [312, 256, 412, 256],
+          [100, 100, 200, 200], [412, 100, 312, 200],
+          [100, 412, 200, 312], [412, 412, 312, 312],
+        ];
+
+        lines.forEach(([x1, y1, x2, y2]) => {
+          ctx.beginPath();
+          ctx.moveTo(x1 * scale, y1 * scale);
+          ctx.lineTo(x2 * scale, y2 * scale);
+          ctx.stroke();
+        });
+
+        // Player 1 cow (dark)
+        ctx.fillStyle = PALETTE.player1;
+        ctx.beginPath();
+        ctx.arc(150 * scale, 150 * scale, 28 * scale, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Player 2 cow (light with border)
+        ctx.fillStyle = PALETTE.player2;
+        ctx.beginPath();
+        ctx.arc(362 * scale, 362 * scale, 28 * scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = PALETTE.lines;
+        ctx.lineWidth = 4 * scale;
+        ctx.stroke();
+
+        // Accent circle in center
+        ctx.fillStyle = PALETTE.accent;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 20 * scale, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Generate 192x192 icon
+      const ctx192 = document.getElementById('canvas192').getContext('2d');
+      drawMorabarabaIcon(ctx192, 192);
+
+      // Generate 512x512 icon
+      const ctx512 = document.getElementById('canvas512').getContext('2d');
+      drawMorabarabaIcon(ctx512, 512);
+
+      // Download buttons
+      const download192 = document.createElement('button');
+      download192.textContent = 'Download icon-192.png';
+      download192.onclick = () => {
+        const link = document.createElement('a');
+        link.download = 'icon-192.png';
+        link.href = document.getElementById('canvas192').toDataURL('image/png');
+        link.click();
+      };
+      document.body.appendChild(download192);
+
+      const download512 = document.createElement('button');
+      download512.textContent = 'Download icon-512.png';
+      download512.onclick = () => {
+        const link = document.createElement('a');
+        link.download = 'icon-512.png';
+        link.href = document.getElementById('canvas512').toDataURL('image/png');
+        link.click();
+      };
+      document.body.appendChild(download512);
+    </script>
+  </body>
+</html>
