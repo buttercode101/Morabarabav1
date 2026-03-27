@@ -27,15 +27,18 @@ Before deploying to Vercel, ensure all files are committed to your GitHub reposi
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "framework": "vite",
-  "nodeVersion": "20.x"
+  "framework": "vite"
 }
 ```
 
 **Purpose:**
-- Specifies Node.js 20.x (required for @vitejs/plugin-react)
-- Sets correct build command and output directory
+- Specifies correct build command and output directory
 - Configures security headers and caching
+
+**Note:** Node.js version is set in Vercel Dashboard, not in `vercel.json`:
+1. Go to your project in Vercel Dashboard
+2. Navigate to **Settings** → **Build & Development Settings**
+3. Set **Node.js Version** to `20.x`
 
 ### 2. npm Configuration (`.npmrc`)
 ```
@@ -121,9 +124,13 @@ In Vercel project settings:
 | **Build Command** | `npm run build` |
 | **Output Directory** | `dist` |
 | **Install Command** | `npm install` |
-| **Node Version** | `20.x` |
+| **Node.js Version** | `20.x` ⚠️ **Set this in Dashboard!** |
 
-> ✅ These are already configured in `vercel.json`
+> ⚠️ **Important:** Node.js version must be set in the Vercel Dashboard:
+> 1. Go to your project in Vercel
+> 2. Click **Settings** → **Build & Development Settings**
+> 3. Find **Node.js Version** and select `20.x`
+> 4. Save changes
 
 ### Step 4: Deploy
 

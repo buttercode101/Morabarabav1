@@ -26,12 +26,13 @@ The Morabaraba game failed to deploy on Vercel due to multiple issues:
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "nodeVersion": "20.x",
   "installCommand": "npm install --legacy-peer-deps"
 }
 ```
 
-**Purpose:** Configures Vercel build process with correct Node.js version and build commands.
+**Purpose:** Configures Vercel build process with correct build commands and security headers.
+
+**Note:** Node.js version is configured in Vercel Dashboard (Settings → Build & Development Settings → Node.js Version → 20.x), not in `vercel.json`.
 
 ---
 
