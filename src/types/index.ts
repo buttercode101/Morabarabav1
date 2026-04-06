@@ -22,6 +22,8 @@ export interface GameState {
   cowsLost: { [key in Player]: number };
   winner: Player | null;
   lastMillPoints: PointId[] | null;
+  lastMillByPlayer: { [key in Player]: string | null };
+  movesWithoutShot: number;
 }
 
 export interface Point {

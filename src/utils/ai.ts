@@ -10,6 +10,8 @@ import { MILLS, ADJACENCY_MAP, POINT_IDS } from '../constants';
 export interface AIMove {
   point: PointId;
   score: number;
+  from?: PointId;
+  to?: PointId;
 }
 
 export interface AISettings {
@@ -225,6 +227,31 @@ export function getAIMove(
   // Check if it's AI's turn
   if (currentPlayer !== aiPlayer) return null;
 
+  if (phase === 'MOVING' || phase === 'FLYING') {
+    const canFly = phase === 'FLYING' || cowsOnBoard[aiPlayer] === 3;
+    type Candidate = { from: PointId; to: PointId; score: number };
+    const candidates: Candidate[] = [];
+
+    for (const from of POINT_IDS) {
+      if (board[from] !== aiPlayer) continue;
+      const destinations = canFly
+        ? POINT_IDS.filter((to) => board[to] === null)
+        : ADJACENCY_MAP[from].filter((to) => board[to] === null);
+
+      for (const to of destinations) {
+        const newBoard = { ...board, [from]: null, [to]: aiPlayer } as BoardState;
+        let moveScore = evaluateBoard(newBoard, aiPlayer);
+        if (checkMill(newBoard, to, aiPlayer)) moveScore += 750;
+        candidates.push({ from, to, score: moveScore });
+      }
+    }
+
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    const best = candidates[0];
+    return { point: best.to, from: best.from, to: best.to, score: best.score };
+  }
+
   const validMoves = getValidMoves(
     board,
     aiPlayer,
@@ -243,7 +270,7 @@ export function getAIMove(
 
   // Check for immediate winning moves (form mill or win game)
   for (const move of validMoves) {
-    const newBoard = { ...board, [move]: aiPlayer };
+    const newBoard = { ...board, [move]: aiPlayer } as BoardState;
     
     // Check if this forms a mill
     if (checkMill(newBoard, move, aiPlayer)) {
@@ -254,7 +281,7 @@ export function getAIMove(
     const opponent = aiPlayer === 1 ? 2 : 1;
     const opponentCanWin = POINT_IDS.some(p => {
       if (board[p] === null) {
-        const testBoard = { ...board, [p]: opponent };
+        const testBoard = { ...board, [p]: opponent } as BoardState;
         return checkMill(testBoard, p, opponent);
       }
       return false;
@@ -262,10 +289,10 @@ export function getAIMove(
 
     if (opponentCanWin) {
       const blockingMove = validMoves.find(m => {
-        const testBoard = { ...board, [m]: aiPlayer };
+        const testBoard = { ...board, [m]: aiPlayer } as BoardState;
         return !POINT_IDS.some(p => {
           if (testBoard[p] === null) {
-            const oppTestBoard = { ...testBoard, [p]: opponent };
+            const oppTestBoard = { ...testBoard, [p]: opponent } as BoardState;
             return checkMill(oppTestBoard, p, opponent);
           }
           return false;
@@ -282,7 +309,7 @@ export function getAIMove(
   let bestScore = -Infinity;
 
   for (const move of validMoves) {
-    const newBoard = { ...board, [move]: aiPlayer };
+    const newBoard = { ...board, [move]: aiPlayer } as BoardState;
     const score = minimax(
       newBoard,
       settings.lookAhead,

@@ -1,18 +1,18 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Users, RotateCcw, Home, Volume2, VolumeX, Trophy, Brain, HelpCircle, Settings, Sparkles, Clock, BookOpen, Info } from 'lucide-react';
+import { Play, Users, RotateCcw, Home, Volume2, VolumeX, Trophy, Brain, HelpCircle, Settings, Sparkles, Clock, BookOpen } from 'lucide-react';
 import { useAudio, useStatistics, useAchievements, useDailyRewards, useParticles, useHaptics, useGameTimer, useLocalStorage } from './hooks';
 import { POINT_COORDINATES, POINT_IDS, ADJACENCY_MAP, MILLS, INITIAL_STATE, PALETTE, STORAGE_KEYS, ACHIEVEMENTS, TUTORIAL_STEPS, BOARD_THEMES, PIECE_THEMES, CULTURAL_INFO, AI_SETTINGS } from './constants';
-import { GamePhase, GameMode, Player, PointId, BoardState, Difficulty, Particle, TutorialState, Achievement } from './types';
-import { getAIMove, getValidMoves, getHint } from './utils/ai';
-import { PremiumButton, GlassCard, Modal, StatCard, AchievementCard, Toggle, Badge } from './components/UIComponents';
+import { GamePhase, GameMode, Player, PointId, BoardState, Difficulty, TutorialState } from './types';
+import { getAIMove, getHint } from './utils/ai';
+import { PremiumButton, Modal, StatCard, AchievementCard, Toggle } from './components/UIComponents';
 
 export default function App() {
   // Game State
   const [phase, setPhase] = useState<GamePhase>('MENU');
   const [mode, setMode] = useState<GameMode>('SINGLE');
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
-  const [sound, setSound] = useLocalStorage<boolean>(STORAGE_KEYS.SETTINGS, true);
+  const [sound, setSound] = useLocalStorage<boolean>(STORAGE_KEYS.SETTINGS + '_sound', true);
   const [music, setMusic] = useLocalStorage<boolean>(STORAGE_KEYS.SETTINGS + '_music', true);
   const [haptics, setHaptics] = useLocalStorage<boolean>(STORAGE_KEYS.SETTINGS + '_haptics', true);
   const [boardTheme, setBoardTheme] = useLocalStorage<string>(STORAGE_KEYS.SETTINGS + '_board', 'classic');
@@ -21,7 +21,7 @@ export default function App() {
   const audio = useAudio(sound, music);
   const haptic = useHaptics(haptics);
   const { stats, recordGame } = useStatistics();
-  const { achievements, checkAchievement, unlockAchievement, getUnlockedCount, getTotalProgress, unlockedThisSession } = useAchievements();
+  const { achievements, checkAchievement, getUnlockedCount, getTotalProgress, unlockedThisSession } = useAchievements();
   const { streak, coins, claimDailyReward, checkDailyReward, addCoins } = useDailyRewards();
   const { particles, spawnParticles, updateParticles } = useParticles();
   const { elapsed, start: startTimer, stop: stopTimer, reset: resetTimer, formatTime } = useGameTimer();
@@ -33,7 +33,6 @@ export default function App() {
   const [hintPoint, setHintPoint] = useState<PointId | null>(null);
   const [millsThisGame, setCowsRemovedThisGame] = useState(0);
   const [flyingThisGame, setFlyingThisGame] = useState(0);
-  const [startTime, setStartTime] = useState<number>(0);
 
   // Tutorial State
   const [tutorialState, setTutorialState] = useLocalStorage<TutorialState>(STORAGE_KEYS.TUTORIAL, {
@@ -46,11 +45,10 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showStats, setShowStats] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [showCulturalInfo, setShowCulturalInfo] = useState(false);
 
-  const { board, currentPlayer, cowsToPlace, cowsOnBoard, winner, lastMillPoints } = gameState;
+  const { board, currentPlayer, cowsToPlace, cowsOnBoard, winner, lastMillPoints, lastMillByPlayer, movesWithoutShot } = gameState;
 
   // Check daily reward on mount
   useEffect(() => {
@@ -88,7 +86,12 @@ export default function App() {
       const timer = setTimeout(() => {
         const aiMove = getAIMove(gameState, 2, difficulty);
         if (aiMove) {
-          handlePointClick(aiMove.point);
+          if ((gameState.phase === 'MOVING' || gameState.phase === 'FLYING') && aiMove.from && aiMove.to) {
+            handlePointClick(aiMove.from);
+            setTimeout(() => handlePointClick(aiMove.to as PointId), 120);
+          } else {
+            handlePointClick(aiMove.point);
+          }
         }
       }, 800);
       return () => clearTimeout(timer);
@@ -115,18 +118,32 @@ export default function App() {
     return null;
   }, []);
 
+  const millKey = useCallback((mill: PointId[] | null): string | null => {
+    if (!mill) return null;
+    return [...mill].sort().join('-');
+  }, []);
+
+  const canShootPiece = useCallback((targetPoint: PointId, player: Player) => {
+    const opponent = player === 1 ? 2 : 1;
+    const opponentPoints = POINT_IDS.filter(p => board[p] === opponent);
+    const nonMillOpponentPoints = opponentPoints.filter(p => !checkMill(board, p, opponent));
+    const targetInMill = !!checkMill(board, targetPoint, opponent);
+    if (nonMillOpponentPoints.length > 0 && targetInMill) return false;
+    return true;
+  }, [board, checkMill]);
+
   // Check win condition
-  const checkWin = useCallback((state: typeof INITIAL_STATE): Player | null => {
+  const checkWin = useCallback((state: typeof INITIAL_STATE, playerToEvaluate: Player): Player | null => {
     if (state.cowsOnBoard[1] < 3) return 2;
     if (state.cowsOnBoard[2] < 3) return 1;
 
     const hasLegalMove = POINT_IDS.some(point => {
-      if (state.board[point] !== state.currentPlayer) return false;
-      if (state.cowsOnBoard[state.currentPlayer] === 3) return true;
+      if (state.board[point] !== playerToEvaluate) return false;
+      if (state.cowsOnBoard[playerToEvaluate] === 3) return true;
       return ADJACENCY_MAP[point].some(adj => state.board[adj] === null);
     });
 
-    if (!hasLegalMove) return state.currentPlayer === 1 ? 2 : 1;
+    if (!hasLegalMove) return playerToEvaluate === 1 ? 2 : 1;
     return null;
   }, []);
 
@@ -160,6 +177,7 @@ export default function App() {
         cowsOnBoard: { ...prev.cowsOnBoard, [currentPlayer]: prev.cowsOnBoard[currentPlayer] + 1 },
         phase: mill ? 'SHOOTING' : (cowsToPlace[1] === 1 && cowsToPlace[2] === 1 ? 'MOVING' : prev.phase),
         lastMillPoints: mill || null,
+        lastMillByPlayer: mill ? { ...prev.lastMillByPlayer, [currentPlayer]: millKey(mill) } : prev.lastMillByPlayer,
       }));
 
       const coords = POINT_COORDINATES[point];
@@ -168,7 +186,7 @@ export default function App() {
       haptic.light();
       
       if (mill) {
-        spawnParticles(coords.x, coords.y, 'glow', 30, ['#4CAF50', '#8BC34A', '#FFD700']);
+        spawnParticles(coords.x, coords.y, 'glow', 30, ['#64DFDF', '#72EFDD', '#4CC9F0']);
         audio.mill();
         setMessage('✨ MILL FORMED!');
         haptic.success();
@@ -189,19 +207,19 @@ export default function App() {
     if (gameState.phase === 'SHOOTING') {
       const opponent = currentPlayer === 1 ? 2 : 1;
       if (occupant !== opponent) return;
-      if (checkMill(board, point, opponent)) return;
+      if (!canShootPiece(point, currentPlayer)) return;
 
       const newBoard = { ...board, [point]: null };
       const newCowsLost = { ...gameState.cowsLost, [opponent]: gameState.cowsLost[opponent] + 1 };
       const newCowsOnBoard = { ...gameState.cowsOnBoard, [opponent]: gameState.cowsOnBoard[opponent] - 1 };
 
-      const win = checkWin({ ...gameState, board: newBoard, cowsOnBoard: newCowsOnBoard });
+      const win = checkWin({ ...gameState, board: newBoard, cowsOnBoard: newCowsOnBoard }, opponent);
 
       const coords = POINT_COORDINATES[point];
-      spawnParticles(coords.x, coords.y, 'spark', 20, ['#f27696', '#FFD700']);
+      spawnParticles(coords.x, coords.y, 'spark', 20, ['#4361EE', '#4CC9F0']);
 
       if (win) {
-        setGameState(prev => ({ ...prev, board: newBoard, cowsLost: newCowsLost, cowsOnBoard: newCowsOnBoard, winner: win }));
+        setGameState(prev => ({ ...prev, board: newBoard, cowsLost: newCowsLost, cowsOnBoard: newCowsOnBoard, winner: win, movesWithoutShot: 0 }));
         audio.win();
         haptic.success();
         if (win === 1) {
@@ -209,14 +227,18 @@ export default function App() {
           checkAchievement('first_blood', stats.wins + 1);
         }
         setPhase('GAME_OVER');
-        recordGame('win', millsThisGame, cowsOnBoard[opponent], cowsOnBoard[currentPlayer], elapsed, mode === 'AI');
+        const result = win === 1 ? 'win' : mode === 'AI' ? 'loss' : 'win';
+        recordGame(result, millsThisGame, cowsOnBoard[opponent], cowsOnBoard[currentPlayer], elapsed, mode === 'AI');
       } else {
         setGameState(prev => ({
           ...prev,
           board: newBoard,
           cowsLost: newCowsLost,
           cowsOnBoard: newCowsOnBoard,
-          phase: 'PLACING',
+          movesWithoutShot: 0,
+          phase: (prev.cowsToPlace[1] === 0 && prev.cowsToPlace[2] === 0)
+            ? (newCowsOnBoard[prev.currentPlayer === 1 ? 2 : 1] === 3 ? 'FLYING' : 'MOVING')
+            : 'PLACING',
           lastMillPoints: null,
           currentPlayer: prev.currentPlayer === 1 ? 2 : 1,
         }));
@@ -242,17 +264,28 @@ export default function App() {
         if (!isAdjacent) return;
 
         const newBoard = { ...board, [selectedPoint]: null, [point]: currentPlayer };
-        const mill = checkMill(newBoard, point, currentPlayer);
+        const detectedMill = checkMill(newBoard, point, currentPlayer);
+        const blockedReform = !!detectedMill && millKey(detectedMill) === lastMillByPlayer[currentPlayer];
+        const mill = blockedReform ? null : detectedMill;
 
         if (canFly && gameState.phase !== 'FLYING') {
           setFlyingThisGame(prev => prev + 1);
           checkAchievement('fly_like_bird', flyingThisGame + 1);
         }
 
-        const win = checkWin({ ...gameState, board: newBoard });
+        const win = checkWin({ ...gameState, board: newBoard }, currentPlayer === 1 ? 2 : 1);
 
         const coords = POINT_COORDINATES[point];
         spawnParticles(coords.x, coords.y, 'dust', 10);
+
+        const bothPlayersAtThree = cowsOnBoard[1] === 3 && cowsOnBoard[2] === 3;
+        const projectedMovesWithoutShot = movesWithoutShot + 1;
+        const drawByStall = bothPlayersAtThree && projectedMovesWithoutShot >= 10;
+
+        if (blockedReform) {
+          setMessage('🚫 Re-forming the same mill immediately is not allowed.');
+          setTimeout(() => setMessage(''), 1800);
+        }
 
         if (win) {
           setGameState(prev => ({ ...prev, board: newBoard, winner: win }));
@@ -260,13 +293,19 @@ export default function App() {
           haptic.success();
           addCoins(100);
           setPhase('GAME_OVER');
-          recordGame('win', millsThisGame, cowsOnBoard[3 - currentPlayer], cowsOnBoard[currentPlayer], elapsed, mode === 'AI');
+          const opponent = currentPlayer === 1 ? 2 : 1;
+          recordGame('win', millsThisGame, cowsOnBoard[opponent], cowsOnBoard[currentPlayer], elapsed, mode === 'AI');
+        } else if (drawByStall) {
+          setGameState(prev => ({ ...prev, board: newBoard, winner: null, movesWithoutShot: projectedMovesWithoutShot }));
+          setPhase('GAME_OVER');
+          recordGame('draw', millsThisGame, 0, 0, elapsed, mode === 'AI');
         } else if (mill) {
           setGameState(prev => ({
             ...prev,
             board: newBoard,
             phase: 'SHOOTING',
             lastMillPoints: mill,
+            lastMillByPlayer: { ...prev.lastMillByPlayer, [currentPlayer]: millKey(mill) },
           }));
           spawnParticles(coords.x, coords.y, 'glow', 30);
           audio.mill();
@@ -280,6 +319,7 @@ export default function App() {
             ...prev,
             board: newBoard,
             currentPlayer: prev.currentPlayer === 1 ? 2 : 1,
+            movesWithoutShot: projectedMovesWithoutShot,
           }));
           audio.move();
         }
@@ -288,7 +328,7 @@ export default function App() {
         return;
       }
     }
-  }, [board, currentPlayer, cowsToPlace, cowsOnBoard, gameState, winner, checkMill, checkWin, audio, haptic, spawnParticles, addCoins, checkAchievement, recordGame, elapsed, mode, stats.wins, millsThisGame, flyingThisGame, phase, tutorialState]);
+  }, [board, currentPlayer, cowsToPlace, cowsOnBoard, gameState, winner, checkMill, checkWin, millKey, canShootPiece, lastMillByPlayer, movesWithoutShot, audio, haptic, spawnParticles, addCoins, checkAchievement, recordGame, elapsed, mode, stats.wins, millsThisGame, flyingThisGame, phase, tutorialState]);
 
   const startGame = (selectedMode: GameMode) => {
     audio.click();
@@ -296,11 +336,10 @@ export default function App() {
     setMode(selectedMode);
     setGameState(INITIAL_STATE);
     setSelectedPoint(null);
-    setPhase('PLAYING');
+    setPhase('PLACING');
     setMessage('');
     setCowsRemovedThisGame(0);
     setFlyingThisGame(0);
-    setStartTime(Date.now());
     startTimer();
   };
 
@@ -351,9 +390,9 @@ export default function App() {
         >
           <div className="text-7xl mb-6 animate-bounce-subtle">🎁</div>
           <h2 className="text-4xl font-black text-gradient-gold mb-4 text-premium">Daily Reward!</h2>
-          <p className="text-lg text-white/80 mb-6">Day <span className="text-[#FFD700] font-bold">{check.streak}</span> of your streak!</p>
-          <div className="bg-gradient-to-br from-[#FFD700]/20 to-[#DAA520]/10 rounded-2xl p-6 mb-8 border border-[#FFD700]/30">
-            <div className="text-5xl font-black text-[#FFD700]">+{check.reward?.coins}</div>
+          <p className="text-lg text-white/80 mb-6">Day <span className="text-[#72EFDD] font-bold">{check.streak}</span> of your streak!</p>
+          <div className="bg-gradient-to-br from-[#4CC9F0]/20 to-[#4361EE]/10 rounded-2xl p-6 mb-8 border border-[#4CC9F0]/30">
+            <div className="text-5xl font-black text-[#72EFDD]">+{check.reward?.coins}</div>
             <div className="text-white/70 font-medium mt-1">Coins</div>
           </div>
           <PremiumButton 
@@ -372,11 +411,11 @@ export default function App() {
   // Render Menu
   if (phase === 'MENU') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#1A0E05] via-[#2A1A0A] to-[#3A2010] text-white relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-b from-[#0B1026] via-[#141B3A] to-[#1F2847] text-white relative overflow-hidden">
         {/* Animated Background Pattern */}
         <div className="absolute inset-0 opacity-5">
           <div className="absolute inset-0" style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23FFD700' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%234CC9F0' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
           }} />
         </div>
 
@@ -502,13 +541,13 @@ export default function App() {
             >
               <div className="inline-flex items-center gap-4 bg-white/10 backdrop-blur-lg rounded-full px-6 py-3 border border-white/20">
                 <span className="text-white/70">Wins:</span>
-                <span className="font-bold text-[#4CAF50]">{stats.wins}</span>
+                <span className="font-bold text-[#64DFDF]">{stats.wins}</span>
                 <span className="text-white/70">|</span>
                 <span className="text-white/70">Losses:</span>
-                <span className="font-bold text-[#EF4444]">{stats.losses}</span>
+                <span className="font-bold text-[#7B2CBF]">{stats.losses}</span>
                 <span className="text-white/70">|</span>
                 <span className="text-white/70">Win Rate:</span>
-                <span className="font-bold text-[#FFD700]">{stats.winRate.toFixed(1)}%</span>
+                <span className="font-bold text-[#4CC9F0]">{stats.winRate.toFixed(1)}%</span>
               </div>
             </motion.div>
           </main>
@@ -526,6 +565,7 @@ export default function App() {
             >
               <div className="space-y-6">
                 <Toggle label="Sound Effects" enabled={sound} onToggle={setSound} />
+                <Toggle label="Background Music" enabled={music} onToggle={setMusic} />
                 <Toggle label="Haptic Feedback" enabled={haptics} onToggle={setHaptics} />
                 
                 <div className="space-y-2">
@@ -533,10 +573,10 @@ export default function App() {
                   <select
                     value={boardTheme}
                     onChange={(e) => setBoardTheme(e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#FFD700]"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#4CC9F0]"
                   >
                     {Object.entries(BOARD_THEMES).map(([key, theme]) => (
-                      <option key={key} value={key} className="bg-[#1A0E05]">{theme.name}</option>
+                      <option key={key} value={key} className="bg-[#0B1026]">{theme.name}</option>
                     ))}
                   </select>
                 </div>
@@ -546,10 +586,10 @@ export default function App() {
                   <select
                     value={pieceTheme}
                     onChange={(e) => setPieceTheme(e.target.value)}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#FFD700]"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#4CC9F0]"
                   >
                     {Object.entries(PIECE_THEMES).map(([key, theme]) => (
-                      <option key={key} value={key} className="bg-[#1A0E05]">{theme.name}</option>
+                      <option key={key} value={key} className="bg-[#0B1026]">{theme.name}</option>
                     ))}
                   </select>
                 </div>
@@ -559,10 +599,10 @@ export default function App() {
                   <select
                     value={difficulty}
                     onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#FFD700]"
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-[#4CC9F0]"
                   >
                     {Object.entries(AI_SETTINGS).map(([key, settings]) => (
-                      <option key={key} value={key} className="bg-[#1A0E05]">{settings.name}</option>
+                      <option key={key} value={key} className="bg-[#0B1026]">{settings.name}</option>
                     ))}
                   </select>
                 </div>
@@ -587,7 +627,7 @@ export default function App() {
                   <motion.div 
                     initial={{ width: 0 }}
                     animate={{ width: `${getTotalProgress()}%` }}
-                    className="bg-gradient-to-r from-[#FFD700] to-[#DAA520] h-4 rounded-full"
+                    className="bg-gradient-to-r from-[#4CC9F0] to-[#4361EE] h-4 rounded-full"
                   />
                 </div>
                 <div className="text-right text-xs text-white/60 mt-1">{getTotalProgress().toFixed(1)}%</div>
@@ -666,7 +706,7 @@ export default function App() {
   if (phase === 'GAME_OVER' || winner) {
     stopTimer();
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#1A0E05] via-[#2A1A0A] to-[#3A2010] text-white p-6 text-center safe-container">
+      <div className="min-h-screen bg-gradient-to-b from-[#0B1026] via-[#141B3A] to-[#1F2847] text-white p-6 text-center safe-container">
         <motion.div 
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
@@ -681,8 +721,8 @@ export default function App() {
             </span>
           </h1>
           <div className="flex justify-center gap-6 text-lg text-white/70 mb-4">
-            <span>Game Time: <span className="text-[#FFD700] font-bold">{formatTime(elapsed)}</span></span>
-            <span>Mills: <span className="text-[#FFD700] font-bold">{millsThisGame}</span></span>
+            <span>Game Time: <span className="text-[#72EFDD] font-bold">{formatTime(elapsed)}</span></span>
+            <span>Mills: <span className="text-[#72EFDD] font-bold">{millsThisGame}</span></span>
           </div>
         </motion.div>
         <div className="flex gap-4 justify-center flex-wrap">
@@ -711,8 +751,8 @@ export default function App() {
   return (
     <div className="min-h-screen flex flex-col safe-container" style={{ background: currentTheme.background }}>
       {/* Header */}
-      <header className="bg-[#5b433b]/90 backdrop-blur-lg text-white px-6 py-4 flex items-center justify-between border-b border-white/10">
-        <button onClick={quitToMenu} className="text-[#f27696] hover:text-[#f27696]/80 font-bold flex items-center gap-2 transition-all">
+      <header className="bg-[#141B3A]/90 backdrop-blur-lg text-white px-6 py-4 flex items-center justify-between border-b border-white/10">
+        <button onClick={quitToMenu} className="text-[#4CC9F0] hover:text-[#72EFDD] font-bold flex items-center gap-2 transition-all">
           <Home className="w-5 h-5" /> <span className="hidden sm:inline">MENU</span>
         </button>
         <div className="flex items-center gap-3">
@@ -722,7 +762,7 @@ export default function App() {
           </div>
           <button 
             onClick={() => setShowHint(!showHint)}
-            className={`p-2 rounded-full transition-all border ${showHint ? 'bg-[#FFD700] border-[#FFD700]' : 'bg-white/10 border-white/20 hover:bg-white/20'}`}
+            className={`p-2 rounded-full transition-all border ${showHint ? 'bg-[#4CC9F0] border-[#4CC9F0]' : 'bg-white/10 border-white/20 hover:bg-white/20'}`}
             title="Show hint"
           >
             <Sparkles className="w-5 h-5" />
@@ -731,7 +771,7 @@ export default function App() {
       </header>
 
       {/* Game Info */}
-      <div className="bg-[#846358]/20 backdrop-blur-lg px-6 py-4 flex items-center justify-between border-b border-white/10">
+      <div className="bg-[#1F2847]/40 backdrop-blur-lg px-6 py-4 flex items-center justify-between border-b border-white/10">
         <div className="text-center">
           <p className="text-xs text-white font-bold">PLAYER 1</p>
           <div className="flex gap-1 mt-1">
@@ -743,8 +783,8 @@ export default function App() {
         </div>
         <div className="text-center">
           <p className="text-sm text-white font-bold">{mode === 'AI' ? `VS ${AI_SETTINGS[difficulty].name}` : '2 PLAYER'}</p>
-          <p className="text-xs text-[#f27696] font-bold">Player {currentPlayer}'s turn</p>
-          {message && <p className="text-xs text-[#4CAF50] font-bold mt-1 animate-pulse">{message}</p>}
+          <p className="text-xs text-[#4CC9F0] font-bold">Player {currentPlayer}'s turn</p>
+          {message && <p className="text-xs text-[#72EFDD] font-bold mt-1 animate-pulse">{message}</p>}
           <div className="text-xs text-white/60 mt-1">{formatTime(elapsed)}</div>
         </div>
         <div className="text-center">
@@ -795,7 +835,7 @@ export default function App() {
               cx={POINT_COORDINATES[hintPoint].x} 
               cy={POINT_COORDINATES[hintPoint].y} 
               r="35" 
-              fill="#FFD700" 
+              fill="#4CC9F0" 
               opacity="0.5"
               className="animate-pulse"
             />
@@ -852,7 +892,7 @@ export default function App() {
       </main>
 
       {/* Instructions */}
-      <div className="bg-[#5b433b]/90 backdrop-blur-lg px-6 py-4 text-center border-t border-white/10">
+      <div className="bg-[#141B3A]/90 backdrop-blur-lg px-6 py-4 text-center border-t border-white/10">
         <p className="text-sm text-white">
           {gameState.phase === 'PLACING' && '📍 Place your cow on an empty point'}
           {gameState.phase === 'MOVING' && '👆 Select a cow, then tap an adjacent empty point'}

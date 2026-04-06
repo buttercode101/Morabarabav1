@@ -7,10 +7,14 @@ interface AudioContextExtended extends AudioContext {
   suspended?: boolean;
 }
 
+interface FadableAudioElement extends HTMLAudioElement {
+  fadeOut?: () => void;
+}
+
 // Audio Hook - Enhanced with music support
 export function useAudio(enabled: boolean, musicEnabled: boolean = true) {
   const ctxRef = useRef<AudioContextExtended | null>(null);
-  const musicRef = useRef<HTMLAudioElement | null>(null);
+  const musicRef = useRef<FadableAudioElement | null>(null);
   const currentMusicRef = useRef<string>('');
 
   const init = useCallback(() => {
@@ -265,6 +269,9 @@ export function useAchievements() {
       }
       return ach;
     }));
+    if (unlocked) {
+      setUnlockedThisSession(prev => (prev.includes(id) ? prev : [...prev, id]));
+    }
     return unlocked;
   }, [setAchievements]);
 
@@ -302,7 +309,7 @@ export function useDailyRewards() {
     totalLogins: 0,
     bestStreak: 0,
   });
-  const [dailyRewards, setDailyRewards] = useLocalStorage<DailyReward[]>(STORAGE_KEYS.DAILY_REWARDS, DAILY_REWARDS);
+  const [dailyRewards] = useLocalStorage<DailyReward[]>(STORAGE_KEYS.DAILY_REWARDS, DAILY_REWARDS);
   const [coins, setCoins] = useLocalStorage<number>(STORAGE_KEYS.UNLOCKS, 0);
 
   const checkDailyReward = useCallback(() => {
