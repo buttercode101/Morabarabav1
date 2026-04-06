@@ -11,17 +11,17 @@
   --font-primary: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-display: 'Space Grotesk', sans-serif;
   
-  /* Colors - African Earth Tones */
-  --color-ochre: #D4A056;
-  --color-terracotta: #C15B3E;
-  --color-sand: #D4B483;
-  --color-clay: #A0522D;
-  --color-soil: #6B4226;
+  /* Colors - Midnight Aurora */
+  --color-ochre: #4CC9F0;
+  --color-terracotta: #4361EE;
+  --color-sand: #7209B7;
+  --color-clay: #3A0CA3;
+  --color-soil: #10002B;
   
   /* Premium Accents */
-  --color-gold: #FFD700;
-  --color-gold-light: #FFE44D;
-  --color-gold-dark: #DAA520;
+  --color-gold: #4CC9F0;
+  --color-gold-light: #72EFDD;
+  --color-gold-dark: #4895EF;
   
   /* Spacing (8px grid) */
   --space-1: 4px;
@@ -48,7 +48,7 @@ html, body, #root {
   margin: 0;
   padding: 0;
   font-family: var(--font-primary);
-  background-color: #1A0E05;
+  background-color: #0B1026;
   touch-action: manipulation;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
@@ -92,14 +92,14 @@ html, body, #root {
 }
 
 .text-gradient-gold {
-  background: linear-gradient(135deg, #FFD700 0%, #F27696 50%, #D6336C 100%);
+  background: linear-gradient(135deg, #72EFDD 0%, #4CC9F0 45%, #4361EE 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .text-gradient-pink {
-  background: linear-gradient(135deg, #FF85AB 0%, #F27696 50%, #D6336C 100%);
+  background: linear-gradient(135deg, #64DFDF 0%, #48BFE3 50%, #5390D9 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -139,26 +139,26 @@ html, body, #root {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #FF6B9D 0%, #D6336C 100%);
+  background: linear-gradient(135deg, #4CC9F0 0%, #4361EE 100%);
   color: white;
   box-shadow: 
-    0 8px 24px rgba(255, 107, 157, 0.4),
+    0 8px 24px rgba(76, 201, 240, 0.4),
     0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .btn-primary:hover {
-  background: linear-gradient(135deg, #FF85AB 0%, #E84A7F 100%);
+  background: linear-gradient(135deg, #72EFDD 0%, #4895EF 100%);
   transform: translateY(-4px) scale(1.02);
   box-shadow: 
-    0 12px 32px rgba(255, 107, 157, 0.5),
+    0 12px 32px rgba(76, 201, 240, 0.5),
     0 6px 16px rgba(0, 0, 0, 0.25);
 }
 
 .btn-primary:active {
-  background: linear-gradient(135deg, #D6336C 0%, #C2255C 100%);
+  background: linear-gradient(135deg, #4361EE 0%, #3A0CA3 100%);
   transform: translateY(0) scale(0.95);
   box-shadow: 
-    0 4px 16px rgba(255, 107, 157, 0.3),
+    0 4px 16px rgba(72, 149, 239, 0.3),
     0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
@@ -180,18 +180,18 @@ html, body, #root {
 }
 
 .btn-gold {
-  background: linear-gradient(135deg, #FFD700 0%, #DAA520 100%);
-  color: #1A0E05;
+  background: linear-gradient(135deg, #72EFDD 0%, #4CC9F0 100%);
+  color: #0B1026;
   box-shadow: 
-    0 8px 24px rgba(255, 215, 0, 0.4),
+    0 8px 24px rgba(76, 201, 240, 0.35),
     0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .btn-gold:hover {
-  background: linear-gradient(135deg, #FFE44D 0%, #E8B84D 100%);
+  background: linear-gradient(135deg, #98F5E1 0%, #56CFE1 100%);
   transform: translateY(-4px) scale(1.02);
   box-shadow: 
-    0 12px 32px rgba(255, 215, 0, 0.5),
+    0 12px 32px rgba(76, 201, 240, 0.45),
     0 6px 16px rgba(0, 0, 0, 0.25);
 }
 
@@ -216,7 +216,7 @@ html, body, #root {
   box-shadow: 
     0 12px 48px rgba(0, 0, 0, 0.5),
     inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    0 0 24px rgba(255, 215, 0, 0.1);
+    0 0 24px rgba(76, 201, 240, 0.2);
 }
 
 /* African Pattern Border */
@@ -228,7 +228,7 @@ html, body, #root {
 
 /* Modal Backdrop */
 .modal-backdrop {
-  background: rgba(10, 5, 2, 0.85);
+  background: rgba(6, 10, 28, 0.88);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
@@ -245,12 +245,12 @@ html, body, #root {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(135deg, #F27696 0%, #D6336C 100%);
+  background: linear-gradient(135deg, #4CC9F0 0%, #4361EE 100%);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #FF85AB 0%, #E84A7F 100%);
+  background: linear-gradient(135deg, #72EFDD 0%, #4895EF 100%);
 }
 
 /* Reduced Motion */

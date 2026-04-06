@@ -1,73 +1,73 @@
 import { PointId, Achievement, DailyReward, TutorialStep, Player, GamePhase, GameState, BoardState } from '../types';
 
 export const PALETTE = {
-  board: '#eaddd7',
-  boardDark: '#d4c4b8',
-  lines: '#5b433b',
-  player1: '#30221e',
-  player2: '#fdf8f6',
-  accent: '#f27696',
-  accentDark: '#e94a74',
-  highlight: '#4CAF50',
-  selected: '#FFD700',
-  legal: '#4CAF5066',
+  board: '#1B1F3B',
+  boardDark: '#12162E',
+  lines: '#4CC9F0',
+  player1: '#72EFDD',
+  player2: '#F1F5F9',
+  accent: '#4361EE',
+  accentDark: '#3A0CA3',
+  highlight: '#64DFDF',
+  selected: '#48BFE3',
+  legal: '#64DFDF66',
 };
 
 // Board Themes
 export const BOARD_THEMES = {
   classic: {
-    name: 'Classic',
-    board: '#eaddd7',
-    lines: '#5b433b',
-    background: 'linear-gradient(180deg, #30221e 0%, #5b433b 100%)',
+    name: 'Midnight',
+    board: '#1B1F3B',
+    lines: '#4CC9F0',
+    background: 'linear-gradient(180deg, #0B1026 0%, #141B3A 100%)',
   },
   forest: {
-    name: 'Forest',
-    board: '#c8d5b9',
-    lines: '#2d4a2d',
-    background: 'linear-gradient(180deg, #1a2f1a 0%, #2d4a2d 100%)',
+    name: 'Aurora',
+    board: '#1E2A4A',
+    lines: '#72EFDD',
+    background: 'linear-gradient(180deg, #101A38 0%, #243B64 100%)',
   },
   ocean: {
-    name: 'Ocean',
-    board: '#b8d4d5',
-    lines: '#1a3a4a',
-    background: 'linear-gradient(180deg, #0a1f2f 0%, #1a3a4a 100%)',
+    name: 'Nebula',
+    board: '#2A1B4D',
+    lines: '#56CFE1',
+    background: 'linear-gradient(180deg, #140F2B 0%, #2A1B4D 100%)',
   },
   sunset: {
-    name: 'Sunset',
-    board: '#d5c8b8',
-    lines: '#4a2d1a',
-    background: 'linear-gradient(180deg, #2f1a0a 0%, #4a2d1a 100%)',
+    name: 'Solar Flare',
+    board: '#2B2E5E',
+    lines: '#80FFDB',
+    background: 'linear-gradient(180deg, #1A1F46 0%, #2F3C7E 100%)',
   },
   royal: {
-    name: 'Royal',
-    board: '#d5b8c8',
-    lines: '#4a1a3a',
-    background: 'linear-gradient(180deg, #2f0a1f 0%, #4a1a3a 100%)',
+    name: 'Electric',
+    board: '#1F2847',
+    lines: '#64DFDF',
+    background: 'linear-gradient(180deg, #111827 0%, #1F2847 100%)',
   },
 };
 
 // Piece Themes
 export const PIECE_THEMES = {
   classic: {
-    name: 'Classic',
-    player1: '#30221e',
-    player2: '#fdf8f6',
+    name: 'Luminous',
+    player1: '#72EFDD',
+    player2: '#F8FAFC',
   },
   gold: {
-    name: 'Gold Rush',
-    player1: '#FFD700',
-    player2: '#C0C0C0',
+    name: 'Ion',
+    player1: '#4CC9F0',
+    player2: '#90E0EF',
   },
   gem: {
-    name: 'Gems',
-    player1: '#9b59b6',
-    player2: '#3498db',
+    name: 'Prism',
+    player1: '#80FFDB',
+    player2: '#5390D9',
   },
   nature: {
-    name: 'Nature',
-    player1: '#27ae60',
-    player2: '#e67e22',
+    name: 'Moonlight',
+    player1: '#64DFDF',
+    player2: '#DEE2E6',
   },
 };
 
