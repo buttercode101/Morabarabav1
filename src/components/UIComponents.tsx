@@ -26,11 +26,11 @@ export function PremiumButton({
 }: PremiumButtonProps) {
   const variants = {
     primary: `
-      bg-gradient-to-br from-[#4CC9F0] to-[#4361EE]
-      hover:from-[#72EFDD] hover:to-[#4895EF]
-      active:from-[#4361EE] active:to-[#3A0CA3]
-      shadow-[0_8px_24px_rgba(76,201,240,0.4)]
-      hover:shadow-[0_12px_32px_rgba(76,201,240,0.5)]
+      bg-gradient-to-br from-[#FF6B9D] to-[#D6336C]
+      hover:from-[#FF85AB] hover:to-[#E84A7F]
+      active:from-[#D6336C] active:to-[#C2255C]
+      shadow-[0_8px_24px_rgba(255,107,157,0.4)]
+      hover:shadow-[0_12px_32px_rgba(255,107,157,0.5)]
       border border-white/20
     `,
     secondary: `
@@ -41,17 +41,17 @@ export function PremiumButton({
       border border-white/30
     `,
     gold: `
-      bg-gradient-to-br from-[#72EFDD] to-[#4CC9F0]
-      hover:from-[#98F5E1] hover:to-[#56CFE1]
-      active:from-[#4CC9F0] active:to-[#4895EF]
-      shadow-[0_8px_24px_rgba(76,201,240,0.4)]
-      text-[#0B1026]
+      bg-gradient-to-br from-[#FFD700] to-[#DAA520]
+      hover:from-[#FFE44D] hover:to-[#E8B84D]
+      active:from-[#DAA520] active:to-[#B8860B]
+      shadow-[0_8px_24px_rgba(255,215,0,0.4)]
+      text-[#1A0E05]
     `,
     earth: `
-      bg-gradient-to-br from-[#3A0CA3] to-[#4361EE]
-      hover:from-[#5A189A] hover:to-[#4895EF]
-      active:from-[#3A0CA3] active:to-[#240046]
-      shadow-[0_8px_24px_rgba(67,97,238,0.45)]
+      bg-gradient-to-br from-[#D4A056] to-[#8B5A3C]
+      hover:from-[#E8B86D] hover:to-[#A87850]
+      active:from-[#A87850] active:to-[#6B4226]
+      shadow-[0_8px_24px_rgba(212,160,86,0.4)]
       text-white
     `,
   };
@@ -177,8 +177,8 @@ export function Modal({ isOpen, onClose, title, icon: Icon, children, size = 'md
         {(title || Icon) && (
           <div className="flex items-center gap-4 mb-8 pb-6 border-b border-white/10">
             {Icon && (
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#4CC9F0] to-[#4361EE] flex items-center justify-center">
-                <Icon className="w-6 h-6 text-[#EAF4FF]" />
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#FFD700] to-[#DAA520] flex items-center justify-center">
+                <Icon className="w-6 h-6 text-[#1A0E05]" />
               </div>
             )}
             <h2 className="text-3xl font-black text-white text-premium">{title}</h2>
@@ -209,8 +209,8 @@ interface StatCardProps {
 
 export function StatCard({ icon: Icon, label, value, subtext, color = 'gold', className = '' }: StatCardProps) {
   const colors = {
-    gold: 'from-[#4CC9F0] to-[#4361EE]',
-    pink: 'from-[#72EFDD] to-[#4CC9F0]',
+    gold: 'from-[#FFD700] to-[#DAA520]',
+    pink: 'from-[#FF6B9D] to-[#D6336C]',
     green: 'from-[#4ADE80] to-[#22C55E]',
     blue: 'from-[#3498db] to-[#2980b9]',
   };
@@ -249,7 +249,7 @@ export function AchievementCard({ achievement, className = '' }: AchievementCard
     <motion.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      className={`p-4 rounded-2xl border-2 transition-all ${achievement.unlocked ? 'border-[#4CC9F0] bg-[#4CC9F0]/10 shadow-[0_0_24px_rgba(76,201,240,0.25)]' : 'border-white/20 bg-white/5 opacity-60'} ${className}`}
+      className={`p-4 rounded-2xl border-2 transition-all ${achievement.unlocked ? 'border-[#FFD700] bg-[#FFD700]/10 shadow-[0_0_24px_rgba(255,215,0,0.2)]' : 'border-white/20 bg-white/5 opacity-60'} ${className}`}
     >
       <div className="flex items-start gap-3">
         <span className="text-4xl">{achievement.icon}</span>
@@ -262,7 +262,7 @@ export function AchievementCard({ achievement, className = '' }: AchievementCard
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${Math.min(100, (achievement.progress / achievement.requirement) * 100)}%` }}
-                  className="bg-gradient-to-r from-[#4CC9F0] to-[#4361EE] h-2 rounded-full transition-all"
+                  className="bg-gradient-to-r from-[#FFD700] to-[#DAA520] h-2 rounded-full transition-all"
                 />
               </div>
               <div className="text-xs text-white/50 mt-1 text-right">
@@ -290,7 +290,7 @@ export function Toggle({ enabled, onToggle, label, className = '' }: ToggleProps
       {label && <span className="text-white font-medium">{label}</span>}
       <button
         onClick={() => onToggle(!enabled)}
-        className={`w-14 h-8 rounded-full transition-all duration-300 ${enabled ? 'bg-[#4CC9F0]' : 'bg-white/20'} relative`}
+        className={`w-14 h-8 rounded-full transition-all duration-300 ${enabled ? 'bg-[#FFD700]' : 'bg-white/20'} relative`}
       >
         <motion.div animate={{ x: enabled ? 24 : 4 }} className="w-6 h-6 bg-white rounded-full absolute top-1 shadow-md" />
       </button>
@@ -307,7 +307,7 @@ interface BadgeProps {
 export function Badge({ children, variant = 'default', className = '' }: BadgeProps) {
   const variants = {
     default: 'bg-white/10 text-white border-white/20',
-    gold: 'bg-[#4CC9F0]/20 text-[#4CC9F0] border-[#4CC9F0]/30',
+    gold: 'bg-[#FFD700]/20 text-[#FFD700] border-[#FFD700]/30',
     success: 'bg-[#22C55E]/20 text-[#4ADE80] border-[#22C55E]/30',
     error: 'bg-[#EF4444]/20 text-[#F87171] border-[#EF4444]/30',
   };
