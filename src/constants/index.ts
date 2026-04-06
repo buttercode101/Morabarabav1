@@ -1,4 +1,4 @@
-import { PointId, Achievement, DailyReward, TutorialStep } from '../types';
+import { PointId, Achievement, DailyReward, TutorialStep, Player, GamePhase, GameState, BoardState } from '../types';
 
 export const PALETTE = {
   board: '#eaddd7',
@@ -106,8 +106,8 @@ export const MILLS: PointId[][] = [
 
 export const POINT_IDS: PointId[] = Object.keys(POINT_COORDINATES) as PointId[];
 
-export const INITIAL_STATE = {
-  board: POINT_IDS.reduce((acc, id) => ({ ...acc, [id]: null }), {}),
+export const INITIAL_STATE: GameState = {
+  board: POINT_IDS.reduce<BoardState>((acc, id) => ({ ...acc, [id]: null }), {} as BoardState),
   currentPlayer: 1 as Player,
   phase: 'PLACING' as GamePhase,
   cowsToPlace: { 1: 12, 2: 12 },
@@ -115,6 +115,8 @@ export const INITIAL_STATE = {
   cowsLost: { 1: 0, 2: 0 },
   winner: null as Player | null,
   lastMillPoints: null as PointId[] | null,
+  lastMillByPlayer: { 1: null, 2: null },
+  movesWithoutShot: 0,
 };
 
 export const STORAGE_KEYS = {

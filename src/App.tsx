@@ -1,18 +1,18 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Users, RotateCcw, Home, Volume2, VolumeX, Trophy, Brain, HelpCircle, Settings, Sparkles, Clock, BookOpen, Info } from 'lucide-react';
+import { Play, Users, RotateCcw, Home, Volume2, VolumeX, Trophy, Brain, HelpCircle, Settings, Sparkles, Clock, BookOpen } from 'lucide-react';
 import { useAudio, useStatistics, useAchievements, useDailyRewards, useParticles, useHaptics, useGameTimer, useLocalStorage } from './hooks';
 import { POINT_COORDINATES, POINT_IDS, ADJACENCY_MAP, MILLS, INITIAL_STATE, PALETTE, STORAGE_KEYS, ACHIEVEMENTS, TUTORIAL_STEPS, BOARD_THEMES, PIECE_THEMES, CULTURAL_INFO, AI_SETTINGS } from './constants';
-import { GamePhase, GameMode, Player, PointId, BoardState, Difficulty, Particle, TutorialState, Achievement } from './types';
-import { getAIMove, getValidMoves, getHint } from './utils/ai';
-import { PremiumButton, GlassCard, Modal, StatCard, AchievementCard, Toggle, Badge } from './components/UIComponents';
+import { GamePhase, GameMode, Player, PointId, BoardState, Difficulty, TutorialState } from './types';
+import { getAIMove, getHint } from './utils/ai';
+import { PremiumButton, Modal, StatCard, AchievementCard, Toggle } from './components/UIComponents';
 
 export default function App() {
   // Game State
   const [phase, setPhase] = useState<GamePhase>('MENU');
   const [mode, setMode] = useState<GameMode>('SINGLE');
   const [difficulty, setDifficulty] = useState<Difficulty>('MEDIUM');
-  const [sound, setSound] = useLocalStorage<boolean>(STORAGE_KEYS.SETTINGS, true);
+  const [sound, setSound] = useLocalStorage<boolean>(STORAGE_KEYS.SETTINGS + '_sound', true);
   const [music, setMusic] = useLocalStorage<boolean>(STORAGE_KEYS.SETTINGS + '_music', true);
   const [haptics, setHaptics] = useLocalStorage<boolean>(STORAGE_KEYS.SETTINGS + '_haptics', true);
   const [boardTheme, setBoardTheme] = useLocalStorage<string>(STORAGE_KEYS.SETTINGS + '_board', 'classic');
@@ -21,7 +21,7 @@ export default function App() {
   const audio = useAudio(sound, music);
   const haptic = useHaptics(haptics);
   const { stats, recordGame } = useStatistics();
-  const { achievements, checkAchievement, unlockAchievement, getUnlockedCount, getTotalProgress, unlockedThisSession } = useAchievements();
+  const { achievements, checkAchievement, getUnlockedCount, getTotalProgress, unlockedThisSession } = useAchievements();
   const { streak, coins, claimDailyReward, checkDailyReward, addCoins } = useDailyRewards();
   const { particles, spawnParticles, updateParticles } = useParticles();
   const { elapsed, start: startTimer, stop: stopTimer, reset: resetTimer, formatTime } = useGameTimer();
@@ -33,7 +33,6 @@ export default function App() {
   const [hintPoint, setHintPoint] = useState<PointId | null>(null);
   const [millsThisGame, setCowsRemovedThisGame] = useState(0);
   const [flyingThisGame, setFlyingThisGame] = useState(0);
-  const [startTime, setStartTime] = useState<number>(0);
 
   // Tutorial State
   const [tutorialState, setTutorialState] = useLocalStorage<TutorialState>(STORAGE_KEYS.TUTORIAL, {
@@ -46,11 +45,10 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showStats, setShowStats] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(false);
   const [showDailyReward, setShowDailyReward] = useState(false);
   const [showCulturalInfo, setShowCulturalInfo] = useState(false);
 
-  const { board, currentPlayer, cowsToPlace, cowsOnBoard, winner, lastMillPoints } = gameState;
+  const { board, currentPlayer, cowsToPlace, cowsOnBoard, winner, lastMillPoints, lastMillByPlayer, movesWithoutShot } = gameState;
 
   // Check daily reward on mount
   useEffect(() => {
@@ -88,7 +86,12 @@ export default function App() {
       const timer = setTimeout(() => {
         const aiMove = getAIMove(gameState, 2, difficulty);
         if (aiMove) {
-          handlePointClick(aiMove.point);
+          if ((gameState.phase === 'MOVING' || gameState.phase === 'FLYING') && aiMove.from && aiMove.to) {
+            handlePointClick(aiMove.from);
+            setTimeout(() => handlePointClick(aiMove.to as PointId), 120);
+          } else {
+            handlePointClick(aiMove.point);
+          }
         }
       }, 800);
       return () => clearTimeout(timer);
@@ -115,18 +118,32 @@ export default function App() {
     return null;
   }, []);
 
+  const millKey = useCallback((mill: PointId[] | null): string | null => {
+    if (!mill) return null;
+    return [...mill].sort().join('-');
+  }, []);
+
+  const canShootPiece = useCallback((targetPoint: PointId, player: Player) => {
+    const opponent = player === 1 ? 2 : 1;
+    const opponentPoints = POINT_IDS.filter(p => board[p] === opponent);
+    const nonMillOpponentPoints = opponentPoints.filter(p => !checkMill(board, p, opponent));
+    const targetInMill = !!checkMill(board, targetPoint, opponent);
+    if (nonMillOpponentPoints.length > 0 && targetInMill) return false;
+    return true;
+  }, [board, checkMill]);
+
   // Check win condition
-  const checkWin = useCallback((state: typeof INITIAL_STATE): Player | null => {
+  const checkWin = useCallback((state: typeof INITIAL_STATE, playerToEvaluate: Player): Player | null => {
     if (state.cowsOnBoard[1] < 3) return 2;
     if (state.cowsOnBoard[2] < 3) return 1;
 
     const hasLegalMove = POINT_IDS.some(point => {
-      if (state.board[point] !== state.currentPlayer) return false;
-      if (state.cowsOnBoard[state.currentPlayer] === 3) return true;
+      if (state.board[point] !== playerToEvaluate) return false;
+      if (state.cowsOnBoard[playerToEvaluate] === 3) return true;
       return ADJACENCY_MAP[point].some(adj => state.board[adj] === null);
     });
 
-    if (!hasLegalMove) return state.currentPlayer === 1 ? 2 : 1;
+    if (!hasLegalMove) return playerToEvaluate === 1 ? 2 : 1;
     return null;
   }, []);
 
@@ -160,6 +177,7 @@ export default function App() {
         cowsOnBoard: { ...prev.cowsOnBoard, [currentPlayer]: prev.cowsOnBoard[currentPlayer] + 1 },
         phase: mill ? 'SHOOTING' : (cowsToPlace[1] === 1 && cowsToPlace[2] === 1 ? 'MOVING' : prev.phase),
         lastMillPoints: mill || null,
+        lastMillByPlayer: mill ? { ...prev.lastMillByPlayer, [currentPlayer]: millKey(mill) } : prev.lastMillByPlayer,
       }));
 
       const coords = POINT_COORDINATES[point];
@@ -189,19 +207,19 @@ export default function App() {
     if (gameState.phase === 'SHOOTING') {
       const opponent = currentPlayer === 1 ? 2 : 1;
       if (occupant !== opponent) return;
-      if (checkMill(board, point, opponent)) return;
+      if (!canShootPiece(point, currentPlayer)) return;
 
       const newBoard = { ...board, [point]: null };
       const newCowsLost = { ...gameState.cowsLost, [opponent]: gameState.cowsLost[opponent] + 1 };
       const newCowsOnBoard = { ...gameState.cowsOnBoard, [opponent]: gameState.cowsOnBoard[opponent] - 1 };
 
-      const win = checkWin({ ...gameState, board: newBoard, cowsOnBoard: newCowsOnBoard });
+      const win = checkWin({ ...gameState, board: newBoard, cowsOnBoard: newCowsOnBoard }, opponent);
 
       const coords = POINT_COORDINATES[point];
       spawnParticles(coords.x, coords.y, 'spark', 20, ['#f27696', '#FFD700']);
 
       if (win) {
-        setGameState(prev => ({ ...prev, board: newBoard, cowsLost: newCowsLost, cowsOnBoard: newCowsOnBoard, winner: win }));
+        setGameState(prev => ({ ...prev, board: newBoard, cowsLost: newCowsLost, cowsOnBoard: newCowsOnBoard, winner: win, movesWithoutShot: 0 }));
         audio.win();
         haptic.success();
         if (win === 1) {
@@ -209,14 +227,18 @@ export default function App() {
           checkAchievement('first_blood', stats.wins + 1);
         }
         setPhase('GAME_OVER');
-        recordGame('win', millsThisGame, cowsOnBoard[opponent], cowsOnBoard[currentPlayer], elapsed, mode === 'AI');
+        const result = win === 1 ? 'win' : mode === 'AI' ? 'loss' : 'win';
+        recordGame(result, millsThisGame, cowsOnBoard[opponent], cowsOnBoard[currentPlayer], elapsed, mode === 'AI');
       } else {
         setGameState(prev => ({
           ...prev,
           board: newBoard,
           cowsLost: newCowsLost,
           cowsOnBoard: newCowsOnBoard,
-          phase: 'PLACING',
+          movesWithoutShot: 0,
+          phase: (prev.cowsToPlace[1] === 0 && prev.cowsToPlace[2] === 0)
+            ? (newCowsOnBoard[prev.currentPlayer === 1 ? 2 : 1] === 3 ? 'FLYING' : 'MOVING')
+            : 'PLACING',
           lastMillPoints: null,
           currentPlayer: prev.currentPlayer === 1 ? 2 : 1,
         }));
@@ -242,17 +264,28 @@ export default function App() {
         if (!isAdjacent) return;
 
         const newBoard = { ...board, [selectedPoint]: null, [point]: currentPlayer };
-        const mill = checkMill(newBoard, point, currentPlayer);
+        const detectedMill = checkMill(newBoard, point, currentPlayer);
+        const blockedReform = !!detectedMill && millKey(detectedMill) === lastMillByPlayer[currentPlayer];
+        const mill = blockedReform ? null : detectedMill;
 
         if (canFly && gameState.phase !== 'FLYING') {
           setFlyingThisGame(prev => prev + 1);
           checkAchievement('fly_like_bird', flyingThisGame + 1);
         }
 
-        const win = checkWin({ ...gameState, board: newBoard });
+        const win = checkWin({ ...gameState, board: newBoard }, currentPlayer === 1 ? 2 : 1);
 
         const coords = POINT_COORDINATES[point];
         spawnParticles(coords.x, coords.y, 'dust', 10);
+
+        const bothPlayersAtThree = cowsOnBoard[1] === 3 && cowsOnBoard[2] === 3;
+        const projectedMovesWithoutShot = movesWithoutShot + 1;
+        const drawByStall = bothPlayersAtThree && projectedMovesWithoutShot >= 10;
+
+        if (blockedReform) {
+          setMessage('🚫 Re-forming the same mill immediately is not allowed.');
+          setTimeout(() => setMessage(''), 1800);
+        }
 
         if (win) {
           setGameState(prev => ({ ...prev, board: newBoard, winner: win }));
@@ -260,13 +293,19 @@ export default function App() {
           haptic.success();
           addCoins(100);
           setPhase('GAME_OVER');
-          recordGame('win', millsThisGame, cowsOnBoard[3 - currentPlayer], cowsOnBoard[currentPlayer], elapsed, mode === 'AI');
+          const opponent = currentPlayer === 1 ? 2 : 1;
+          recordGame('win', millsThisGame, cowsOnBoard[opponent], cowsOnBoard[currentPlayer], elapsed, mode === 'AI');
+        } else if (drawByStall) {
+          setGameState(prev => ({ ...prev, board: newBoard, winner: null, movesWithoutShot: projectedMovesWithoutShot }));
+          setPhase('GAME_OVER');
+          recordGame('draw', millsThisGame, 0, 0, elapsed, mode === 'AI');
         } else if (mill) {
           setGameState(prev => ({
             ...prev,
             board: newBoard,
             phase: 'SHOOTING',
             lastMillPoints: mill,
+            lastMillByPlayer: { ...prev.lastMillByPlayer, [currentPlayer]: millKey(mill) },
           }));
           spawnParticles(coords.x, coords.y, 'glow', 30);
           audio.mill();
@@ -280,6 +319,7 @@ export default function App() {
             ...prev,
             board: newBoard,
             currentPlayer: prev.currentPlayer === 1 ? 2 : 1,
+            movesWithoutShot: projectedMovesWithoutShot,
           }));
           audio.move();
         }
@@ -288,7 +328,7 @@ export default function App() {
         return;
       }
     }
-  }, [board, currentPlayer, cowsToPlace, cowsOnBoard, gameState, winner, checkMill, checkWin, audio, haptic, spawnParticles, addCoins, checkAchievement, recordGame, elapsed, mode, stats.wins, millsThisGame, flyingThisGame, phase, tutorialState]);
+  }, [board, currentPlayer, cowsToPlace, cowsOnBoard, gameState, winner, checkMill, checkWin, millKey, canShootPiece, lastMillByPlayer, movesWithoutShot, audio, haptic, spawnParticles, addCoins, checkAchievement, recordGame, elapsed, mode, stats.wins, millsThisGame, flyingThisGame, phase, tutorialState]);
 
   const startGame = (selectedMode: GameMode) => {
     audio.click();
@@ -296,11 +336,10 @@ export default function App() {
     setMode(selectedMode);
     setGameState(INITIAL_STATE);
     setSelectedPoint(null);
-    setPhase('PLAYING');
+    setPhase('PLACING');
     setMessage('');
     setCowsRemovedThisGame(0);
     setFlyingThisGame(0);
-    setStartTime(Date.now());
     startTimer();
   };
 
@@ -526,6 +565,7 @@ export default function App() {
             >
               <div className="space-y-6">
                 <Toggle label="Sound Effects" enabled={sound} onToggle={setSound} />
+                <Toggle label="Background Music" enabled={music} onToggle={setMusic} />
                 <Toggle label="Haptic Feedback" enabled={haptics} onToggle={setHaptics} />
                 
                 <div className="space-y-2">
